@@ -1,5 +1,6 @@
 package io.izzel.arclight.common.mixin.core.server;
 
+import com.google.common.collect.ImmutableList;
 import com.mojang.datafixers.DataFixer;
 import io.izzel.arclight.api.ArclightVersion;
 import io.izzel.arclight.common.bridge.core.command.ICommandSourceBridge;
@@ -20,6 +21,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.LayeredRegistryAccess;
+import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.protocol.status.ServerStatus;
@@ -43,16 +45,20 @@ import net.minecraft.util.Unit;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.util.profiling.jfr.JvmProfiler;
 import net.minecraft.util.thread.ReentrantBlockableEventLoop;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.DataPackConfig;
-import net.minecraft.world.level.ForcedChunksSavedData;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.RandomSequences;
+import net.minecraft.world.entity.ai.village.VillageSiege;
+import net.minecraft.world.entity.npc.CatSpawner;
+import net.minecraft.world.entity.npc.WanderingTraderSpawner;
+import net.minecraft.world.level.*;
+import net.minecraft.world.level.biome.BiomeManager;
+import net.minecraft.world.level.border.BorderChangeListener;
 import net.minecraft.world.level.border.WorldBorder;
+import net.minecraft.world.level.dimension.LevelStem;
+import net.minecraft.world.level.levelgen.PatrolSpawner;
+import net.minecraft.world.level.levelgen.PhantomSpawner;
 import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
-import net.minecraft.world.level.storage.LevelStorageSource;
-import net.minecraft.world.level.storage.ServerLevelData;
-import net.minecraft.world.level.storage.WorldData;
+import net.minecraft.world.level.storage.*;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.internal.BrandingControl;
@@ -75,7 +81,6 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
@@ -85,13 +90,11 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.net.Proxy;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.function.BooleanSupplier;
 
-@Mixin(MinecraftServer.class)
+@Mixin(value = MinecraftServer.class, priority = 500)
 public abstract class MinecraftServerMixin extends ReentrantBlockableEventLoop<TickTask> implements MinecraftServerBridge, ICommandSourceBridge {
 
     // @formatter:off
@@ -149,6 +152,10 @@ public abstract class MinecraftServerMixin extends ReentrantBlockableEventLoop<T
     @Shadow @Nullable private ServerStatus.Favicon statusIcon;
     @Shadow protected abstract Optional<ServerStatus.Favicon> loadStatusIcon();
     // @formatter:on
+
+    @Shadow @Nullable public abstract ServerLevel getLevel(ResourceKey<Level> p_129881_);
+
+    @Shadow public abstract Set<ResourceKey<Level>> levelKeys();
 
     public MinecraftServerMixin(String name) {
         super(name);
@@ -340,20 +347,85 @@ public abstract class MinecraftServerMixin extends ReentrantBlockableEventLoop<T
         BukkitRegistry.registerEnvironments(this.registryAccess().registryOrThrow(Registries.LEVEL_STEM));
     }
 
-    @Redirect(method = "createLevels", at = @At(value = "INVOKE", remap = false, target = "Ljava/util/Map;put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"))
-    private Object arclight$worldInit(Map<Object, Object> map, Object key, Object value) {
-        Object ret = map.put(key, value);
-        ServerLevel serverWorld = (ServerLevel) value;
+    @Inject(method = "createLevels", at = @At(value = "HEAD", remap = false, target = "Ljava/util/Map;put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"), cancellable = true)
+    private void arclight$worldInit(ChunkProgressListener p_129816_, CallbackInfo ci) {
+        ci.cancel();
+        MinecraftServer minecraftServer = (MinecraftServer) (Object) this;
+        ServerLevelData serverleveldata = this.worldData.overworldData();
+        boolean flag = this.worldData.isDebugWorld();
+        Registry<LevelStem> registry = minecraftServer.registries.compositeAccess().registryOrThrow(Registries.LEVEL_STEM);
+        WorldOptions worldoptions = this.worldData.worldGenOptions();
+        long i = worldoptions.seed();
+        long j = BiomeManager.obfuscateSeed(i);
+        List<CustomSpawner> list = ImmutableList.of(new PhantomSpawner(), new PatrolSpawner(), new CatSpawner(), new VillageSiege(), new WanderingTraderSpawner(serverleveldata));
+        LevelStem levelstem = (LevelStem)registry.get(LevelStem.OVERWORLD);
+        ServerLevel serverlevel = new ServerLevel(minecraftServer, this.executor, minecraftServer.storageSource, serverleveldata, Level.OVERWORLD, levelstem, p_129816_, flag, j, list, true, (RandomSequences)null);
+        this.levels.put(Level.OVERWORLD, serverlevel);
         if (((CraftServer) Bukkit.getServer()).scoreboardManager == null) {
-            ((CraftServer) Bukkit.getServer()).scoreboardManager = new CraftScoreboardManager((MinecraftServer) (Object) this, serverWorld.getScoreboard());
+            ((CraftServer) Bukkit.getServer()).scoreboardManager = new CraftScoreboardManager((MinecraftServer) (Object) this, serverlevel.getScoreboard());
         }
-        if (((WorldBridge) serverWorld).bridge$getGenerator() != null) {
-            ((WorldBridge) serverWorld).bridge$getWorld().getPopulators().addAll(
-                ((WorldBridge) serverWorld).bridge$getGenerator().getDefaultPopulators(
-                    ((WorldBridge) serverWorld).bridge$getWorld()));
+        if (((WorldBridge) serverlevel).bridge$getGenerator() != null) {
+            ((WorldBridge) serverlevel).bridge$getWorld().getPopulators().addAll(
+                    ((WorldBridge) serverlevel).bridge$getGenerator().getDefaultPopulators(
+                            ((WorldBridge) serverlevel).bridge$getWorld()));
         }
-        Bukkit.getPluginManager().callEvent(new WorldInitEvent(((WorldBridge) serverWorld).bridge$getWorld()));
-        return ret;
+        Bukkit.getPluginManager().callEvent(new WorldInitEvent(((WorldBridge) serverlevel).bridge$getWorld()));
+        DimensionDataStorage dimensiondatastorage = serverlevel.getDataStorage();
+        minecraftServer.readScoreboard(dimensiondatastorage);
+        minecraftServer.commandStorage = new CommandStorage(dimensiondatastorage);
+        WorldBorder worldborder = serverlevel.getWorldBorder();
+        MinecraftForge.EVENT_BUS.post(new LevelEvent.Load((LevelAccessor)this.levels.get(Level.OVERWORLD)));
+        if (!serverleveldata.isInitialized()) {
+            try {
+                setInitialSpawn(serverlevel, serverleveldata, worldoptions.generateBonusChest(), flag);
+                serverleveldata.setInitialized(true);
+                if (flag) {
+                    this.setupDebugLevel(this.worldData);
+                }
+            } catch (Throwable var23) {
+                CrashReport crashreport = CrashReport.forThrowable(var23, "Exception initializing level");
+
+                try {
+                    serverlevel.fillReportDetails(crashreport);
+                } catch (Throwable var22) {
+                }
+
+                throw new ReportedException(crashreport);
+            }
+
+            serverleveldata.setInitialized(true);
+        }
+
+        this.getPlayerList().addWorldborderListener(serverlevel);
+        if (this.worldData.getCustomBossEvents() != null) {
+            minecraftServer.getCustomBossEvents().load(this.worldData.getCustomBossEvents());
+        }
+
+        RandomSequences randomsequences = serverlevel.getRandomSequences();
+        Iterator var24 = registry.entrySet().iterator();
+
+        while(var24.hasNext()) {
+            Map.Entry<ResourceKey<LevelStem>, LevelStem> entry = (Map.Entry)var24.next();
+            ResourceKey<LevelStem> resourcekey = (ResourceKey)entry.getKey();
+            if (resourcekey != LevelStem.OVERWORLD) {
+                ResourceKey<Level> resourcekey1 = ResourceKey.create(Registries.DIMENSION, resourcekey.location());
+                DerivedLevelData derivedleveldata = new DerivedLevelData(this.worldData, serverleveldata);
+                ServerLevel serverlevel1 = new ServerLevel(minecraftServer, this.executor, minecraftServer.storageSource, derivedleveldata, resourcekey1, (LevelStem)entry.getValue(), p_129816_, flag, j, ImmutableList.of(), false, randomsequences);
+                worldborder.addListener(new BorderChangeListener.DelegateBorderChangeListener(serverlevel1.getWorldBorder()));
+                this.levels.put(resourcekey1, serverlevel1);
+                if (((CraftServer) Bukkit.getServer()).scoreboardManager == null) {
+                    ((CraftServer) Bukkit.getServer()).scoreboardManager = new CraftScoreboardManager((MinecraftServer) (Object) this, serverlevel1.getScoreboard());
+                }
+                if (((WorldBridge) serverlevel1).bridge$getGenerator() != null) {
+                    ((WorldBridge) serverlevel1).bridge$getWorld().getPopulators().addAll(
+                            ((WorldBridge) serverlevel1).bridge$getGenerator().getDefaultPopulators(
+                                    ((WorldBridge) serverlevel1).bridge$getWorld()));
+                }
+                MinecraftForge.EVENT_BUS.post(new LevelEvent.Load((LevelAccessor)this.levels.get(resourcekey)));
+            }
+        }
+
+        worldborder.applySettings(serverleveldata.getWorldBorder());
     }
 
     /**
