@@ -19,11 +19,6 @@ public class ArclightModProjectile extends CraftProjectile {
     }
 
     @Override
-    public @NotNull EntityType getType() {
-        return entityType;
-    }
-
-    @Override
     public String toString() {
         return "ArclightModProjectile{" + entityType + '}';
     }

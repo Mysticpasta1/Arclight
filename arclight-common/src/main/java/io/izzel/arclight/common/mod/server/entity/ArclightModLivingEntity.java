@@ -18,11 +18,6 @@ public class ArclightModLivingEntity extends CraftLivingEntity {
     }
 
     @Override
-    public @NotNull EntityType getType() {
-        return entityType;
-    }
-
-    @Override
     public String toString() {
         return "ArclightModLivingEntity{" + entityType + '}';
     }

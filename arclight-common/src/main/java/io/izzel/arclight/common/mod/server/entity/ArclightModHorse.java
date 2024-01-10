@@ -20,12 +20,6 @@ public class ArclightModHorse extends CraftAbstractHorse {
     }
 
     @Override
-    @NotNull
-    public EntityType getType() {
-        return this.entityType;
-    }
-
-    @Override
     public Horse.@NotNull Variant getVariant() {
         return Horse.Variant.HORSE;
     }

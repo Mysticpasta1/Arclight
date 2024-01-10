@@ -18,11 +18,6 @@ public class ArclightModEntity extends CraftEntity {
     }
 
     @Override
-    public @NotNull EntityType getType() {
-        return entityType;
-    }
-
-    @Override
     public String toString() {
         return "ArclightModEntity{" + entityType + '}';
     }

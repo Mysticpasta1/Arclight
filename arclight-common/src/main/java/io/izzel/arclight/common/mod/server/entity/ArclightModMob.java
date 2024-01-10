@@ -19,11 +19,6 @@ public class ArclightModMob extends CraftMob {
     }
 
     @Override
-    public @NotNull EntityType getType() {
-        return entityType;
-    }
-
-    @Override
     public String toString() {
         return "ArclightModMob{" + entityType + '}';
     }

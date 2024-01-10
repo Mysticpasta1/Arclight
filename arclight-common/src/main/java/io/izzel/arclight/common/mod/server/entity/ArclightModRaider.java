@@ -19,11 +19,6 @@ public class ArclightModRaider extends CraftRaider {
     }
 
     @Override
-    public @NotNull EntityType getType() {
-        return entityType;
-    }
-
-    @Override
     public String toString() {
         return "ArclightModRaider{" + entityType + '}';
     }

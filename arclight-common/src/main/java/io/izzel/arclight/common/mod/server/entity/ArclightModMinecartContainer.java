@@ -18,11 +18,6 @@ public class ArclightModMinecartContainer extends CraftMinecartContainer {
     }
 
     @Override
-    public @NotNull EntityType getType() {
-        return entityType;
-    }
-
-    @Override
     public String toString() {
         return "ArclightModMinecartContainer{" + entityType + '}';
     }
