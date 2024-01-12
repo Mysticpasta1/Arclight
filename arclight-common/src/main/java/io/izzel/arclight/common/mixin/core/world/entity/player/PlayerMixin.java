@@ -25,10 +25,8 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.stats.Stat;
 import net.minecraft.stats.Stats;
-import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.Unit;
-import net.minecraft.world.Difficulty;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffects;
@@ -52,7 +50,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.scores.Scoreboard;
-import net.minecraftforge.common.ForgeHooks;
 import net.minecraftforge.common.extensions.IForgePlayer;
 import net.minecraftforge.entity.PartEntity;
 import org.bukkit.Bukkit;
@@ -182,49 +179,6 @@ public abstract class PlayerMixin extends LivingEntityMixin implements PlayerEnt
                 player.getInventory().addItem(drop.getItemStack());
             }
             cir.setReturnValue(null);
-        }
-    }
-
-    /**
-     * @author IzzelAliz
-     * @reason
-     */
-    @Inject(method = "hurt", at = @At(("HEAD")), cancellable = true)
-    public void hurt(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
-        cir.cancel();
-        if (!ForgeHooks.onPlayerAttack((net.minecraft.world.entity.player.Player) (Object) this, source, amount))
-            cir.setReturnValue(false);
-        if (this.isInvulnerableTo(source)) {
-            cir.setReturnValue(false);
-        } else if (this.abilities.invulnerable && !source.is(DamageTypeTags.BYPASSES_INVULNERABILITY)) {
-            cir.setReturnValue(false);
-        } else {
-            this.noActionTime = 0;
-            if (this.getHealth() <= 0.0F) {
-                cir.setReturnValue(false);
-            } else {
-                if (source.scalesWithDifficulty()) {
-                    if (this.level().getDifficulty() == Difficulty.PEACEFUL) {
-                        // amount = 0.0F;
-                        cir.setReturnValue(false);
-                    }
-
-                    if (this.level().getDifficulty() == Difficulty.EASY) {
-                        amount = Math.min(amount / 2.0F + 1.0F, amount);
-                    }
-
-                    if (this.level().getDifficulty() == Difficulty.HARD) {
-                        amount = amount * 3.0F / 2.0F;
-                    }
-                }
-
-                boolean damaged = this.hurt(source, amount);
-                if (damaged) {
-                    this.removeEntitiesOnShoulder();
-                }
-                cir.setReturnValue(true);
-                //return amount == 0.0F ? false : super.attackEntityFrom(source, amount);
-            }
         }
     }
 

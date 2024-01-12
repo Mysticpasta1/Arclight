@@ -43,12 +43,13 @@ public abstract class AnimalMixin extends AgeableMobMixin implements AnimalEntit
     public ItemStack breedItem;
 
     /**
+     * @return
      * @author IzzelAliz
      * @reason
      */
     @Inject(method = "hurt", at = @At("HEAD"), cancellable = true)
     public void hurt(DamageSource damage, float amount, CallbackInfoReturnable<Boolean> cir) {
-        super.hurt(damage, amount, cir);
+        this.hurt(damage, amount);
     }
 
     @Inject(method = "setInLove(Lnet/minecraft/world/entity/player/Player;)V", cancellable = true, at = @At("HEAD"))
