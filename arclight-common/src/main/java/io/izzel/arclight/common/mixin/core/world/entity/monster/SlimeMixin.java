@@ -15,6 +15,9 @@ import org.bukkit.event.entity.SlimeSplitEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,9 +34,10 @@ public abstract class SlimeMixin extends MobMixin {
      * @author IzzelAliz
      * @reason
      */
-    @Overwrite(remap = false)
-    @Override
-    public void remove(Entity.RemovalReason p_149847_) {
+
+    @Inject(method = "remove", at = @At("HEAD"), cancellable = true)
+    public void remove(Entity.RemovalReason p_149847_, CallbackInfo ci) {
+        ci.cancel();
         int i = this.getSize();
         if (!this.level().isClientSide && i > 1 && this.isDeadOrDying()) {
             Component itextcomponent = this.getCustomName();
