@@ -197,6 +197,8 @@ public abstract class LivingEntityMixin extends EntityMixin implements LivingEnt
     @Shadow public static EquipmentSlot getEquipmentSlotForItem(ItemStack p_147234_) { return null; }
     // @formatter:on
 
+    @Shadow public abstract boolean hurt(DamageSource p_21016_, float p_21017_);
+
     public int expToDrop;
     public boolean forceDrops;
     public CraftAttributeMap craftAttributes;
@@ -509,17 +511,18 @@ public abstract class LivingEntityMixin extends EntityMixin implements LivingEnt
      * @author IzzelAliz
      * @reason
      */
-    @Overwrite
-    public boolean hurt(DamageSource source, float amount) {
-        if (!ForgeHooks.onLivingAttack((LivingEntity) (Object) this, source, amount)) return false;
+    @Inject(method = "hurt", at = @At("HEAD"), cancellable = true)
+    public void hurt(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+        cir.cancel();
+        if (!ForgeHooks.onLivingAttack((LivingEntity) (Object) this, source, amount)) cir.setReturnValue(false);
         if (this.isInvulnerableTo(source)) {
-            return false;
+            cir.setReturnValue(false);
         } else if (this.level().isClientSide) {
-            return false;
+            cir.setReturnValue(false);
         } else if (this.dead || this.isRemoved() || this.getHealth() <= 0.0F) {
-            return false;
+            cir.setReturnValue(false);
         } else if (source.is(DamageTypeTags.IS_FIRE) && this.hasEffect(MobEffects.FIRE_RESISTANCE)) {
-            return false;
+            cir.setReturnValue(false);
         } else {
             if (this.isSleeping() && !this.level().isClientSide) {
                 this.stopSleeping();
@@ -553,17 +556,17 @@ public abstract class LivingEntityMixin extends EntityMixin implements LivingEnt
             boolean flag1 = true;
             if ((float) this.invulnerableTime > (float) this.invulnerableDuration / 2.0F && !source.is(DamageTypeTags.BYPASSES_COOLDOWN)) {
                 if (amount <= this.lastHurt) {
-                    return false;
+                    cir.setReturnValue(false);
                 }
 
                 if (!this.damageEntity0(source, amount - this.lastHurt)) {
-                    return false;
+                    cir.setReturnValue(false);
                 }
                 this.lastHurt = amount;
                 flag1 = false;
             } else {
                 if (!this.damageEntity0(source, amount)) {
-                    return false;
+                    cir.setReturnValue(false);
                 }
                 this.lastHurt = amount;
                 this.invulnerableTime = 20;
@@ -656,7 +659,7 @@ public abstract class LivingEntityMixin extends EntityMixin implements LivingEnt
                 CriteriaTriggers.PLAYER_HURT_ENTITY.trigger((ServerPlayer) entity1, (LivingEntity) (Object) this, source, f, amount, flag);
             }
 
-            return flag2;
+            cir.setReturnValue(flag2);
         }
     }
 

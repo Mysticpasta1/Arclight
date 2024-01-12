@@ -189,23 +189,24 @@ public abstract class PlayerMixin extends LivingEntityMixin implements PlayerEnt
      * @author IzzelAliz
      * @reason
      */
-    @Overwrite
-    public boolean hurt(DamageSource source, float amount) {
+    @Inject(method = "hurt", at = @At(("HEAD")), cancellable = true)
+    public void hurt(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+        cir.cancel();
         if (!ForgeHooks.onPlayerAttack((net.minecraft.world.entity.player.Player) (Object) this, source, amount))
-            return false;
+            cir.setReturnValue(false);
         if (this.isInvulnerableTo(source)) {
-            return false;
+            cir.setReturnValue(false);
         } else if (this.abilities.invulnerable && !source.is(DamageTypeTags.BYPASSES_INVULNERABILITY)) {
-            return false;
+            cir.setReturnValue(false);
         } else {
             this.noActionTime = 0;
             if (this.getHealth() <= 0.0F) {
-                return false;
+                cir.setReturnValue(false);
             } else {
                 if (source.scalesWithDifficulty()) {
                     if (this.level().getDifficulty() == Difficulty.PEACEFUL) {
                         // amount = 0.0F;
-                        return false;
+                        cir.setReturnValue(false);
                     }
 
                     if (this.level().getDifficulty() == Difficulty.EASY) {
@@ -217,11 +218,11 @@ public abstract class PlayerMixin extends LivingEntityMixin implements PlayerEnt
                     }
                 }
 
-                boolean damaged = super.hurt(source, amount);
+                boolean damaged = this.hurt(source, amount);
                 if (damaged) {
                     this.removeEntitiesOnShoulder();
                 }
-                return damaged;
+                cir.setReturnValue(true);
                 //return amount == 0.0F ? false : super.attackEntityFrom(source, amount);
             }
         }

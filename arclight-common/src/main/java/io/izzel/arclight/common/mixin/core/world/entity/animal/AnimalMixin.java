@@ -25,6 +25,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import javax.annotation.Nullable;
 import java.util.Optional;
@@ -45,9 +46,9 @@ public abstract class AnimalMixin extends AgeableMobMixin implements AnimalEntit
      * @author IzzelAliz
      * @reason
      */
-    @Overwrite
-    public boolean hurt(DamageSource source, float amount) {
-        return super.hurt(source, amount);
+    @Inject(method = "hurt", at = @At("HEAD"), cancellable = true)
+    public void hurt(DamageSource damage, float amount, CallbackInfoReturnable<Boolean> cir) {
+        super.hurt(damage, amount, cir);
     }
 
     @Inject(method = "setInLove(Lnet/minecraft/world/entity/player/Player;)V", cancellable = true, at = @At("HEAD"))
