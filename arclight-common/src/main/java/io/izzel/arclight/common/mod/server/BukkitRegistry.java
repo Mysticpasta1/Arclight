@@ -71,11 +71,11 @@ public class BukkitRegistry {
     private static final Map<String, EntityType> ENTITY_NAME_MAP = Unsafe.getStatic(EntityType.class, "NAME_MAP");
     private static final Map<Integer, World.Environment> ENVIRONMENT_MAP = Unsafe.getStatic(World.Environment.class, "lookup");
     static final BiMap<ResourceKey<LevelStem>, World.Environment> DIM_MAP =
-        HashBiMap.create(ImmutableMap.<ResourceKey<LevelStem>, World.Environment>builder()
-            .put(LevelStem.OVERWORLD, World.Environment.NORMAL)
-            .put(LevelStem.NETHER, World.Environment.NETHER)
-            .put(LevelStem.END, World.Environment.THE_END)
-            .build());
+            HashBiMap.create(ImmutableMap.<ResourceKey<LevelStem>, World.Environment>builder()
+                    .put(LevelStem.OVERWORLD, World.Environment.NORMAL)
+                    .put(LevelStem.NETHER, World.Environment.NETHER)
+                    .put(LevelStem.END, World.Environment.THE_END)
+                    .build());
     private static final Map<String, Art> ART_BY_NAME = Unsafe.getStatic(Art.class, "BY_NAME");
     private static final Map<Integer, Art> ART_BY_ID = Unsafe.getStatic(Art.class, "BY_ID");
     private static final BiMap<ResourceLocation, Statistic> STATS = HashBiMap.create(Unsafe.getStatic(CraftStatistic.class, "statistics"));
@@ -96,7 +96,6 @@ public class BukkitRegistry {
         loadEndDragonPhase();
         loadCookingBookCategory();
         loadFluids();
-        loadGameEvents();
         try {
             for (var field : org.bukkit.Registry.class.getFields()) {
                 if (Modifier.isStatic(field.getModifiers()) && field.get(null) instanceof org.bukkit.Registry.SimpleRegistry<?> registry) {
@@ -104,24 +103,6 @@ public class BukkitRegistry {
                 }
             }
         } catch (Throwable ignored) {
-        }
-    }
-
-    private static void loadGameEvents() {
-        try {
-            var constructor = GameEvent.class.getDeclaredConstructor(NamespacedKey.class);
-            constructor.setAccessible(true);
-            var handle = Unsafe.lookup().unreflectConstructor(constructor);
-            for (var gameEvent : BuiltInRegistries.GAME_EVENT) {
-                var key = BuiltInRegistries.GAME_EVENT.getKey(gameEvent);
-                var bukkit = GameEvent.getByKey(CraftNamespacedKey.fromMinecraft(key));
-                if (bukkit == null) {
-                    bukkit = (GameEvent) handle.invoke(CraftNamespacedKey.fromMinecraft(key));
-                    ArclightMod.LOGGER.debug("Registered {} as game event {}", key, bukkit);
-                }
-            }
-        } catch (Throwable t) {
-            throw new RuntimeException(t);
         }
     }
 
@@ -402,8 +383,8 @@ public class BukkitRegistry {
                 String name = ResourceLocationUtil.standardize(location);
                 MobEffectInstance effectInstance = potion.getEffects().isEmpty() ? null : potion.getEffects().get(0);
                 PotionType potionType = EnumHelper.makeEnum(PotionType.class, name, typeId++,
-                    Arrays.asList(PotionEffectType.class, boolean.class, boolean.class),
-                    Arrays.asList(effectInstance == null ? null : PotionEffectType.getById(MobEffect.getId(effectInstance.getEffect())), false, false));
+                        Arrays.asList(PotionEffectType.class, boolean.class, boolean.class),
+                        Arrays.asList(effectInstance == null ? null : PotionEffectType.getById(MobEffect.getId(effectInstance.getEffect())), false, false));
                 newTypes.add(potionType);
                 map.put(potionType, location.toString());
                 ArclightMod.LOGGER.debug("Registered {} as potion type {}", location, potionType);
@@ -501,9 +482,9 @@ public class BukkitRegistry {
 
     private static Set<IForgeRegistry<?>> registries() {
         return ImmutableSet.of(ForgeRegistries.BLOCKS, ForgeRegistries.ITEMS,
-            ForgeRegistries.MOB_EFFECTS, ForgeRegistries.POTIONS,
-            ForgeRegistries.ENTITY_TYPES, ForgeRegistries.BLOCK_ENTITY_TYPES,
-            ForgeRegistries.BIOMES);
+                ForgeRegistries.MOB_EFFECTS, ForgeRegistries.POTIONS,
+                ForgeRegistries.ENTITY_TYPES, ForgeRegistries.BLOCK_ENTITY_TYPES,
+                ForgeRegistries.BIOMES);
     }
 
     public static void unlockRegistries() {
