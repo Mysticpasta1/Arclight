@@ -25,6 +25,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import javax.annotation.Nullable;
 import java.util.Optional;
@@ -39,16 +40,15 @@ public abstract class AnimalMixin extends AgeableMobMixin implements AnimalEntit
     @Shadow @Nullable public abstract ServerPlayer getLoveCause();
     // @formatter:on
 
+
     public ItemStack breedItem;
 
     /**
      * @author IzzelAliz
      * @reason
      */
-    @Overwrite
-    public boolean hurt(DamageSource source, float amount) {
-        return super.hurt(source, amount);
-    }
+    @Inject(method = "hurt", at = @At("HEAD"))
+    public void hurt(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {}
 
     @Inject(method = "setInLove(Lnet/minecraft/world/entity/player/Player;)V", cancellable = true, at = @At("HEAD"))
     private void arclight$enterLove(Player player, CallbackInfo ci) {

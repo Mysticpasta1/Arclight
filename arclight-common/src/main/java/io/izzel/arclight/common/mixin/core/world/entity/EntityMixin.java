@@ -120,7 +120,9 @@ public abstract class EntityMixin implements InternalEntityBridge, EntityBridge,
     @Shadow public abstract String getScoreboardName();
     @Shadow protected abstract void handleNetherPortal();
     @Shadow public abstract boolean fireImmune();
-    @Shadow public abstract boolean hurt(DamageSource source, float amount);
+    @Shadow public boolean hurt(DamageSource source, float amount){
+    return false;
+    }
     @Shadow public abstract void setSecondsOnFire(int seconds);
     @Shadow public boolean horizontalCollision;
     @Shadow protected abstract Vec3 collide(Vec3 vec);

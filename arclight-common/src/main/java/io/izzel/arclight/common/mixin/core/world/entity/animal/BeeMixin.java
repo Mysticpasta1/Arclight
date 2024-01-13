@@ -6,7 +6,6 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.animal.Bee;
 import org.bukkit.event.entity.EntityPotionEffectEvent;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -28,17 +27,18 @@ public abstract class BeeMixin extends AnimalMixin {
      * @author IzzelAliz
      * @reason
      */
-    @Overwrite
-    public boolean hurt(DamageSource source, float amount) {
+    @Inject(method = "hurt", at = @At("HEAD"))
+    public void hurt(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+        cir.cancel();
         if (this.isInvulnerableTo(source)) {
-            return false;
+            cir.setReturnValue(false);
         } else {
             Entity entity = source.getEntity();
             boolean ret = super.hurt(source, amount);
             if (ret && !this.level().isClientSide) {
                 this.beePollinateGoal.stopPollinating();
             }
-            return ret;
+            cir.setReturnValue(ret);
         }
     }
 }
