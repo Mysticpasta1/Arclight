@@ -28,17 +28,5 @@ public abstract class BeeMixin extends AnimalMixin {
      * @reason
      */
     @Inject(method = "hurt", at = @At("HEAD"))
-    public void hurt(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
-        cir.cancel();
-        if (this.isInvulnerableTo(source)) {
-            cir.setReturnValue(false);
-        } else {
-            Entity entity = source.getEntity();
-            boolean ret = super.hurt(source, amount);
-            if (ret && !this.level().isClientSide) {
-                this.beePollinateGoal.stopPollinating();
-            }
-            cir.setReturnValue(ret);
-        }
-    }
+    public void hurt(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {}
 }
