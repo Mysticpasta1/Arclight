@@ -1,5 +1,6 @@
 package io.izzel.arclight.common.mixin.core.server;
 
+import com.google.common.collect.ImmutableList;
 import com.mojang.datafixers.DataFixer;
 import io.izzel.arclight.api.ArclightVersion;
 import io.izzel.arclight.common.bridge.core.command.ICommandSourceBridge;
@@ -44,17 +45,20 @@ import net.minecraft.util.Unit;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.util.profiling.jfr.JvmProfiler;
 import net.minecraft.util.thread.ReentrantBlockableEventLoop;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.DataPackConfig;
-import net.minecraft.world.level.ForcedChunksSavedData;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.RandomSequences;
+import net.minecraft.world.entity.ai.village.VillageSiege;
+import net.minecraft.world.entity.npc.CatSpawner;
+import net.minecraft.world.entity.npc.WanderingTraderSpawner;
+import net.minecraft.world.level.*;
+import net.minecraft.world.level.biome.BiomeManager;
+import net.minecraft.world.level.border.BorderChangeListener;
 import net.minecraft.world.level.border.WorldBorder;
 import net.minecraft.world.level.dimension.LevelStem;
+import net.minecraft.world.level.levelgen.PatrolSpawner;
+import net.minecraft.world.level.levelgen.PhantomSpawner;
 import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
-import net.minecraft.world.level.storage.LevelStorageSource;
-import net.minecraft.world.level.storage.ServerLevelData;
-import net.minecraft.world.level.storage.WorldData;
+import net.minecraft.world.level.storage.*;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.internal.BrandingControl;
@@ -66,7 +70,6 @@ import org.bukkit.command.RemoteConsoleCommandSender;
 import org.bukkit.craftbukkit.v.CraftServer;
 import org.bukkit.craftbukkit.v.scoreboard.CraftScoreboardManager;
 import org.bukkit.event.server.ServerLoadEvent;
-import org.bukkit.event.world.WorldInitEvent;
 import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.plugin.PluginLoadOrder;
 import org.slf4j.Logger;
@@ -86,10 +89,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.net.Proxy;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.function.BooleanSupplier;
 
@@ -342,39 +342,16 @@ public abstract class MinecraftServerMixin extends ReentrantBlockableEventLoop<T
         BukkitRegistry.registerEnvironments(this.registryAccess().registryOrThrow(Registries.LEVEL_STEM));
     }
 
-    @Inject(method = "createLevels", at = @At(value = "INVOKE", opcode = 0, remap = false, target = "Ljava/util/Map;put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"))
-    private void arclight$worldInit(ChunkProgressListener p_129816_, CallbackInfo ci) {
-        for (ServerLevel serverWorld : ((MinecraftServer) (Object) this).getAllLevels()) {
-            Registry<LevelStem> registry =  ((MinecraftServer) (Object) this).registries.compositeAccess().registryOrThrow(Registries.LEVEL_STEM);
-
-            for (Map.Entry<ResourceKey<LevelStem>, LevelStem> resourceKeyLevelStemEntry : registry.entrySet()) {
-                Map.Entry<ResourceKey<LevelStem>, LevelStem> entry = (Map.Entry) resourceKeyLevelStemEntry;
-                ResourceKey<LevelStem> resourcekey = (ResourceKey) entry.getKey();
-                if (resourcekey == LevelStem.OVERWORLD) {
-                    levels.put(Level.OVERWORLD, serverWorld);
-                    if (((CraftServer) Bukkit.getServer()).scoreboardManager == null) {
-                        ((CraftServer) Bukkit.getServer()).scoreboardManager = new CraftScoreboardManager((MinecraftServer) (Object) this, serverWorld.getScoreboard());
-                    }
-                    if (((WorldBridge) serverWorld).bridge$getGenerator() != null) {
-                        ((WorldBridge) serverWorld).bridge$getWorld().getPopulators().addAll(
-                                ((WorldBridge) serverWorld).bridge$getGenerator().getDefaultPopulators(
-                                        ((WorldBridge) serverWorld).bridge$getWorld()));
-                    }
-                    Bukkit.getPluginManager().callEvent(new WorldInitEvent(((WorldBridge) serverWorld).bridge$getWorld()));
-                } else {
-                    ResourceKey<Level> resourcekey1 = ResourceKey.create(Registries.DIMENSION, resourcekey.location());
-                    levels.put(resourcekey1, serverWorld);
-                    if (((CraftServer) Bukkit.getServer()).scoreboardManager == null) {
-                        ((CraftServer) Bukkit.getServer()).scoreboardManager = new CraftScoreboardManager((MinecraftServer) (Object) this, serverWorld.getScoreboard());
-                    }
-                    if (((WorldBridge) serverWorld).bridge$getGenerator() != null) {
-                        ((WorldBridge) serverWorld).bridge$getWorld().getPopulators().addAll(
-                                ((WorldBridge) serverWorld).bridge$getGenerator().getDefaultPopulators(
-                                        ((WorldBridge) serverWorld).bridge$getWorld()));
-                    }
-                    Bukkit.getPluginManager().callEvent(new WorldInitEvent(((WorldBridge) serverWorld).bridge$getWorld()));
-                }
-            }
+    @Inject(method = "createLevels", at = @At(value = "INVOKE", remap = false, target = "Ljava/util/Map;put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"), locals = LocalCapture.CAPTURE_FAILHARD)
+    private void arclight$worldInit(ChunkProgressListener p_129816_, CallbackInfo ci, ServerLevelData serverLevelData, boolean thing, Registry registry, WorldOptions worldOptions, long thing2, long thing3, List list,
+            LevelStem levelStem, ServerLevel serverlevel) {
+        if (((CraftServer) Bukkit.getServer()).scoreboardManager == null) {
+            ((CraftServer) Bukkit.getServer()).scoreboardManager = new CraftScoreboardManager((MinecraftServer) (Object) this, serverlevel.getScoreboard());
+        }
+        if (((WorldBridge) serverlevel).bridge$getGenerator() != null) {
+            ((WorldBridge) serverlevel).bridge$getWorld().getPopulators().addAll(
+                    ((WorldBridge) serverlevel).bridge$getGenerator().getDefaultPopulators(
+                            ((WorldBridge) serverlevel).bridge$getWorld()));
         }
     }
 
@@ -427,8 +404,8 @@ public abstract class MinecraftServerMixin extends ReentrantBlockableEventLoop<T
         boolean flag = saveData.isDebugWorld();
         if (((WorldBridge) serverWorld).bridge$getGenerator() != null) {
             ((WorldBridge) serverWorld).bridge$getWorld().getPopulators().addAll(
-                ((WorldBridge) serverWorld).bridge$getGenerator().getDefaultPopulators(
-                    ((WorldBridge) serverWorld).bridge$getWorld()));
+                    ((WorldBridge) serverWorld).bridge$getGenerator().getDefaultPopulators(
+                            ((WorldBridge) serverWorld).bridge$getWorld()));
         }
         WorldBorder worldborder = serverWorld.getWorldBorder();
         worldborder.applySettings(worldInfo.getWorldBorder());
