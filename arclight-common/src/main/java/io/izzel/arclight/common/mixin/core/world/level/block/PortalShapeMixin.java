@@ -9,8 +9,8 @@ import net.minecraft.BlockUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.NetherPortalBlock;
@@ -18,6 +18,7 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.portal.PortalInfo;
 import net.minecraft.world.level.portal.PortalShape;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.common.extensions.IForgeBlockState;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.block.BlockState;
@@ -29,10 +30,12 @@ import org.bukkit.event.world.PortalCreateEvent;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -42,6 +45,7 @@ import java.util.List;
 public abstract class PortalShapeMixin implements PortalSizeBridge {
 
     // @formatter:off
+    @Final @Shadow private static BlockBehaviour.StatePredicate FRAME = IForgeBlockState::isPortalFrame;
     @Shadow @Final private LevelAccessor level;
     @Shadow public abstract void shadow$createPortalBlocks();
     @Shadow @Final private Direction.Axis axis;
@@ -54,13 +58,33 @@ public abstract class PortalShapeMixin implements PortalSizeBridge {
 
     List<BlockState> blocks = new ArrayList<>();
 
-    @Redirect(method = "getDistanceUntilEdgeAboveFrame", at = @At(value = "INVOKE", ordinal = 0, target = "Lnet/minecraft/world/level/block/state/BlockBehaviour$StatePredicate;test(Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/world/level/BlockGetter;Lnet/minecraft/core/BlockPos;)Z"))
-    private boolean arclight$captureBlock(BlockBehaviour.StatePredicate predicate, net.minecraft.world.level.block.state.BlockState p_test_1_, BlockGetter p_test_2_, BlockPos pos) {
-        boolean test = predicate.test(p_test_1_, p_test_2_, pos);
-        if (test) {
-            blocks.add(CraftBlock.at(this.level, pos).getState());
+    @Inject(method = "getDistanceUntilEdgeAboveFrame", at = @At(value = "HEAD"), cancellable = true)
+    private void arclight$captureBlock(BlockPos p_77736_, Direction p_77737_, CallbackInfoReturnable<Integer> cir) {
+        BlockPos.MutableBlockPos blockpos$mutableblockpos = new BlockPos.MutableBlockPos();
+
+        for(int i = 0; i <= 21; ++i) {
+            blockpos$mutableblockpos.set(p_77736_).move(p_77737_, i);
+            net.minecraft.world.level.block.state.BlockState blockstate = this.level.getBlockState(blockpos$mutableblockpos);
+            if (!arclight$isEmpty(blockstate)) {
+                if (FRAME.test(blockstate, this.level, blockpos$mutableblockpos)) {
+                    blocks.add(CraftBlock.at(this.level, p_77736_).getState());
+                    cir.setReturnValue(i);
+                }
+                break;
+            }
+
+            net.minecraft.world.level.block.state.BlockState blockstate1 = this.level.getBlockState(blockpos$mutableblockpos.move(Direction.DOWN));
+            if (!FRAME.test(blockstate1, this.level, blockpos$mutableblockpos)) {
+                break;
+            }
         }
-        return test;
+
+        cir.setReturnValue(0);
+    }
+
+    @Unique
+    private static boolean arclight$isEmpty(net.minecraft.world.level.block.state.BlockState p_77718_) {
+        return p_77718_.isAir() || p_77718_.is(BlockTags.FIRE) || p_77718_.is(Blocks.NETHER_PORTAL);
     }
 
     @Inject(method = "createPortalBlocks", cancellable = true, at = @At("HEAD"))
